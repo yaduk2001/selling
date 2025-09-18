@@ -1,0 +1,12 @@
+selling-infinity-backend/node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+.env.*
+.vercel
+node_modules
+.next

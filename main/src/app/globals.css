@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@theme {
+  --color-light-primary: #ffffff;
+  --color-light-secondary: #f3f4f6;
+  --color-light-accent: #1d4ed8;
+  --color-light-text: #090d14;
+  --color-light-border: #e5e7eb;
+  
+  --color-dark-primary: #121212;
+  --color-dark-secondary: #1e1e1e;
+  --color-dark-accent: #facc15;
+  --color-dark-text: #e5e5e5;
+  --color-dark-border: #2e2e2e;
+
+  --font-family-heading: 'Montserrat', sans-serif;
+  --font-family-body: 'Lato', sans-serif;
+  
+  /* Define the colors properly for Tailwind utilities */
+  --color-primary: light-dark(var(--color-light-primary), var(--color-dark-primary));
+  --color-secondary: light-dark(var(--color-light-secondary), var(--color-dark-secondary));
+  --color-accent: light-dark(var(--color-light-accent), var(--color-dark-accent));
+  --color-text: light-dark(var(--color-light-text), var(--color-dark-text));
+  --color-border: light-dark(var(--color-light-border), var(--color-dark-border));
+}
+
+@layer base {
+  /* Force dark mode styles for all elements */
+  html {
+    color-scheme: dark;
+  }
+  
+  body {
+    background-color: #111827 !important;
+    color: #f9fafb !important;
+  }
+  
+  /* Override any white backgrounds to dark */
+  .bg-white {
+    background-color: #1f2937 !important;
+  }
+  
+  /* Override light text colors */
+  .text-gray-900 {
+    color: #f9fafb !important;
+  }
+  
+  .text-gray-700 {
+    color: #d1d5db !important;
+  }
+  
+  .text-gray-600 {
+    color: #9ca3af !important;
+  }
+  
+  .text-gray-500 {
+    color: #6b7280 !important;
+  }
+  
+  /* Override light borders */
+  .border-gray-200 {
+    border-color: #374151 !important;
+  }
+  
+  .border-gray-300 {
+    border-color: #4b5563 !important;
+  }
+  
+  /* Override light hover states */
+  .hover\:bg-gray-100:hover {
+    background-color: #374151 !important;
+  }
+  
+  .hover\:bg-gray-50:hover {
+    background-color: #374151 !important;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-heading);
+  }
+}
+
+@layer components {
+  /* This utility class is for your main content width */
+  .content-container {
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* These add consistent padding */
+  .container-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  @media (min-width: 640px) {
+    .container-padding {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .container-padding {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+  
+  .section-padding {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+  @media (min-width: 640px) {
+    .section-padding {
+      padding-top: 5rem;
+      padding-bottom: 5rem;
+    }
+  }
+  
+  /* Component: Primary Button */
+  .btn-primary {
+    background-color: var(--color-light-accent);
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  .dark .btn-primary {
+    background-color: var(--color-dark-accent);
+    color: var(--color-dark-primary);
+  }
+
+  /* Component: Secondary Button */
+  .btn-secondary {
+    background-color: #e5e7eb;
+    color: var(--color-light-text);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+  }
+  .btn-secondary:hover {
+    background-color: #d1d5db;
+  }
+  .dark .btn-secondary {
+    background-color: var(--color-dark-secondary);
+    color: var(--color-dark-text);
+  }
+  .dark .btn-secondary:hover {
+    background-color: #374151;
+  }
+  
+  /* Component: Card */
+  .card-ui {
+    background-color: var(--color-light-primary);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+    transition: all 0.3s ease;
+  }
+  .card-ui:hover {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-0.25rem);
+  }
+  .dark .card-ui {
+    background-color: var(--color-dark-secondary);
+  }
+  
+  .card-popular-ui {
+    outline: 2px solid var(--color-light-accent);
+    outline-offset: 2px;
+  }
+  .dark .card-popular-ui {
+    outline: 2px solid var(--color-dark-accent);
+  }
+  
+  .popular-badge-ui {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-50%);
+    background-color: var(--color-light-accent);
+    color: white;
+    padding: 0.25rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    z-index: 20;
+  }
+  .dark .popular-badge-ui {
+    background-color: var(--color-dark-accent);
+    color: var(--color-dark-primary);
+  }
+
+  /* Simple dot pattern background */
+  .bg-grid-light {
+    background-image: radial-gradient(circle, rgba(156, 163, 175, 0.2) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .bg-grid-dark {
+    background-image: radial-gradient(circle, rgba(75, 85, 99, 0.4) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+@layer utilities {
+  .text-hero {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+  @media (min-width: 640px) {
+    .text-hero { font-size: 3rem; }
+  }
+  @media (min-width: 768px) {
+    .text-hero { font-size: 3.75rem; }
+  }
+  @media (min-width: 1024px) {
+    .text-hero { font-size: 4.5rem; }
+  }
+  
+  .text-section {
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  @media (min-width: 640px) {
+    .text-section { font-size: 2.25rem; }
+  }
+  
+  .text-body {
+    font-size: 1.125rem;
+  }
+  
+  .text-button {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+}
