@@ -301,13 +301,39 @@ async function handlePaymentFailed(paymentIntent) {
 
 async function sendConfirmationEmail(transaction, product, session) {
   try {
-    // Get customer email from session (most reliable) or transaction
-    const customerEmail = session?.customer_details?.email || transaction.customer_email;
-    const customerName = session?.customer_details?.name || transaction.customer_name || 'Customer';
+    // Get customer email from logged-in user's profile (most reliable)
+    let customerEmail = null;
+    let customerName = 'Customer';
+    
+    // First, try to get email from logged-in user's profile
+    if (transaction.user_id) {
+      console.log('Getting email from logged-in user profile:', transaction.user_id);
+      const { data: userProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', transaction.user_id)
+        .single();
+      
+      if (!profileError && userProfile) {
+        customerEmail = userProfile.email;
+        customerName = userProfile.full_name || 'Customer';
+        console.log('Found user email from profile:', customerEmail);
+      } else {
+        console.log('Profile error:', profileError);
+      }
+    }
+    
+    // Fallback to session or transaction email if no user profile found
+    if (!customerEmail) {
+      customerEmail = session?.customer_details?.email || transaction.customer_email;
+      customerName = session?.customer_details?.name || transaction.customer_name || 'Customer';
+      console.log('Using fallback email:', customerEmail);
+    }
     
     console.log(`Sending confirmation email to ${customerEmail} for ${product?.name}`);
     console.log('Session customer details:', session?.customer_details);
     console.log('Transaction customer email:', transaction.customer_email);
+    console.log('Transaction user_id:', transaction.user_id);
     
     // Check if we have a valid customer email
     if (!customerEmail) {
