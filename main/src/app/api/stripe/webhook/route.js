@@ -140,8 +140,8 @@ async function handleCheckoutSessionCompleted(session) {
       await createCalendarEvent(transaction, product);
     }
 
-    // Send confirmation email (you can implement this later)
-    await sendConfirmationEmail(transaction, product);
+    // Send confirmation email
+    await sendConfirmationEmail(transaction, product, session);
 
     console.log('Successfully processed checkout session:', session.id);
   } catch (error) {
@@ -299,9 +299,21 @@ async function handlePaymentFailed(paymentIntent) {
   }
 }
 
-async function sendConfirmationEmail(transaction, product) {
+async function sendConfirmationEmail(transaction, product, session) {
   try {
-    console.log(`Sending confirmation email to ${transaction.customer_email} for ${product?.name}`);
+    // Get customer email from session (most reliable) or transaction
+    const customerEmail = session?.customer_details?.email || transaction.customer_email;
+    const customerName = session?.customer_details?.name || transaction.customer_name || 'Customer';
+    
+    console.log(`Sending confirmation email to ${customerEmail} for ${product?.name}`);
+    console.log('Session customer details:', session?.customer_details);
+    console.log('Transaction customer email:', transaction.customer_email);
+    
+    // Check if we have a valid customer email
+    if (!customerEmail) {
+      console.error('No customer email found - cannot send confirmation email');
+      return;
+    }
     
     // Check if email service is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -330,7 +342,6 @@ async function sendConfirmationEmail(transaction, product) {
     }
 
     // Prepare email content
-    const customerName = transaction.customer_name || 'Customer';
     const sessionDate = transaction.booking_date ? new Date(transaction.booking_date).toLocaleDateString() : 'Not specified';
     const sessionTime = transaction.booking_time || 'Not specified';
     const productName = product?.name || 'Service';
@@ -389,7 +400,7 @@ async function sendConfirmationEmail(transaction, product) {
     // Send email using Nodemailer
     const info = await transporter.sendMail({
       from: `"Selling Infinity" <${process.env.EMAIL_USER}>`,
-      to: transaction.customer_email,
+      to: customerEmail,
       subject: `✅ Booking Confirmed - ${productName}`,
       html: htmlContent,
     });
