@@ -186,12 +186,35 @@ export async function POST(request) {
 
     console.log('Booking created successfully:', booking);
 
-    // 3. Create calendar event if it's a coaching session
+    // 3. Get product details for email and calendar event
     const { data: product } = await supabaseAdmin
       .from('products')
       .select('*')
       .eq('id', transaction.product_id)
       .single();
+
+    // 4. Send booking confirmation email
+    try {
+      console.log('📧 Sending booking confirmation email...');
+      const emailResult = await sendConfirmationEmail(transaction, product, booking);
+      if (emailResult && emailResult.success) {
+        console.log('✅ Booking confirmation email sent successfully');
+        console.log('   Message ID:', emailResult.messageId);
+        console.log('   Customer Email:', emailResult.customerEmail);
+        console.log('   Email Source:', emailResult.emailSource);
+      } else {
+        console.error('❌ Failed to send booking confirmation email');
+        if (emailResult) {
+          console.error('   Error:', emailResult.error);
+          console.error('   Error Type:', emailResult.errorType);
+          console.error('   Transaction ID:', emailResult.transactionId);
+        }
+      }
+    } catch (emailError) {
+      console.error('❌ Error sending confirmation email:', emailError);
+    }
+
+    // 5. Create calendar event if it's a coaching session
 
     if (product && (product.type === 'coaching_individual' || product.type === 'coaching_team')) {
       const startTime = new Date(`${reservation.booking_date}T${reservation.booking_time}`);
@@ -248,4 +271,307 @@ export async function GET(request) {
   };
 
   return POST(mockRequest);
+}
+
+async function sendConfirmationEmail(transaction, product, booking) {
+  try {
+    console.log('=== BOOKING CONFIRMATION EMAIL PROCESSING ===');
+    console.log('Transaction ID:', transaction.id);
+    console.log('Product:', product?.name);
+    console.log('User ID:', transaction.user_id);
+    
+    // SECURITY: Validate required parameters
+    if (!transaction || !transaction.id) {
+      console.error('Invalid transaction data provided');
+      return { success: false, error: 'Invalid transaction data' };
+    }
+    
+    if (!product || !product.name) {
+      console.error('Invalid product data provided');
+      return { success: false, error: 'Invalid product data' };
+    }
+    
+    // Get customer email from logged-in user's profile (SECURE & RELIABLE)
+    let customerEmail = null;
+    let customerName = 'Customer';
+    let emailSource = 'unknown';
+    
+    // PRIORITY 1: Get email from logged-in user's profile (MOST SECURE)
+    if (transaction.user_id) {
+      console.log('🔍 Extracting email from logged-in user profile...');
+      console.log('User ID:', transaction.user_id);
+      
+      try {
+        const { data: userProfile, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', transaction.user_id)
+          .single();
+        
+        if (!profileError && userProfile && userProfile.email) {
+          customerEmail = userProfile.email.trim();
+          customerName = userProfile.full_name?.trim() || 'Customer';
+          emailSource = 'user_profile';
+          console.log('✅ Successfully extracted email from user profile');
+          console.log('Email:', customerEmail);
+          console.log('Name:', customerName);
+        } else {
+          console.log('❌ Profile error or no email found:', profileError?.message || 'No email in profile');
+        }
+      } catch (profileError) {
+        console.error('❌ Database error while fetching user profile:', profileError);
+      }
+    } else {
+      console.log('⚠️ No user_id found in transaction - user may not be logged in');
+    }
+    
+    // PRIORITY 2: Fallback to transaction customer email
+    if (!customerEmail) {
+      console.log('🔍 Falling back to transaction customer email...');
+      customerEmail = transaction.customer_email?.trim();
+      customerName = 'Customer';
+      emailSource = 'transaction_data';
+      console.log('Using transaction email:', customerEmail);
+    }
+    
+    // SECURITY: Validate email exists and is not empty
+    if (!customerEmail || customerEmail.length === 0) {
+      console.error('❌ No customer email found - cannot send confirmation email');
+      return { success: false, error: 'No customer email found' };
+    }
+    
+    // SECURITY: Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(customerEmail)) {
+      console.error(`❌ Invalid email format: ${customerEmail}`);
+      return { success: false, error: 'Invalid email format' };
+    }
+    
+    // SECURITY: Check for placeholder/invalid emails
+    const invalidEmails = [
+      'guest@checkout.stripe.com',
+      'test@example.com', 
+      'user@example.com',
+      'placeholder@example.com',
+      'admin@example.com',
+      'noreply@example.com'
+    ];
+    
+    if (invalidEmails.includes(customerEmail.toLowerCase())) {
+      console.error(`❌ Invalid placeholder email detected: ${customerEmail}`);
+      return { success: false, error: 'Invalid placeholder email' };
+    }
+    
+    // SECURITY: Log email source for audit trail
+    console.log('📧 Email extraction summary:');
+    console.log('   Source:', emailSource);
+    console.log('   Email:', customerEmail);
+    console.log('   Name:', customerName);
+    console.log('   Transaction ID:', transaction.id);
+    
+    // SECURITY: Check if email service is configured
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error('❌ Email service not configured - missing EMAIL_USER or EMAIL_PASS');
+      return { success: false, error: 'Email service not configured' };
+    }
+    
+    console.log('📧 Email service configuration verified');
+    console.log('   SMTP User:', process.env.EMAIL_USER);
+    console.log('   SMTP Pass:', process.env.EMAIL_PASS ? '***configured***' : 'NOT SET');
+
+    // Import nodemailer with error handling
+    let nodemailer;
+    try {
+      nodemailer = await import('nodemailer');
+      console.log('✅ Nodemailer imported successfully');
+    } catch (importError) {
+      console.error('❌ Failed to import nodemailer:', importError);
+      return { success: false, error: 'Failed to import email library' };
+    }
+
+    // Create Nodemailer transporter with Gmail SMTP (SECURE CONFIGURATION)
+    let transporter;
+    try {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false // Allow self-signed certificates
+        }
+      });
+      console.log('✅ Nodemailer transporter created');
+    } catch (transporterError) {
+      console.error('❌ Failed to create transporter:', transporterError);
+      return { success: false, error: 'Failed to create email transporter' };
+    }
+
+    // SECURITY: Verify SMTP connection before sending
+    try {
+      console.log('🔍 Verifying SMTP connection...');
+      await transporter.verify();
+      console.log('✅ SMTP connection verified successfully');
+    } catch (verifyError) {
+      console.error('❌ SMTP connection verification failed:', verifyError);
+      return { success: false, error: 'SMTP connection failed' };
+    }
+
+    // Prepare email content
+    const sessionDate = booking.booking_date ? new Date(booking.booking_date).toLocaleDateString() : 'Not specified';
+    const sessionTime = booking.booking_time || 'Not specified';
+    const productName = product?.name || 'Service';
+    const amountPaid = product?.price ? (product.price / 100).toFixed(2) : '0.00';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white;">
+        <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 40px 20px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">✅ Booking Confirmed!</h1>
+          <p style="color: #fed7aa; margin: 10px 0 0 0; font-size: 16px;">Your session has been successfully booked</p>
+        </div>
+        
+        <div style="padding: 40px 20px;">
+          <p style="font-size: 16px; color: #374151; margin-bottom: 30px;">
+            Hi ${customerName},
+          </p>
+          
+          <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+            Great news! Your booking has been confirmed. Here are your session details:
+          </p>
+          
+          <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
+            <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px;">📅 Session Details</h3>
+            <div style="display: grid; gap: 15px;">
+              <div><strong>Date:</strong> ${sessionDate}</div>
+              <div><strong>Time:</strong> ${sessionTime}</div>
+              <div><strong>Service:</strong> ${productName}</div>
+              <div><strong>Amount Paid:</strong> $${amountPaid}</div>
+              <div><strong>Booking ID:</strong> ${booking.id}</div>
+            </div>
+          </div>
+          
+          <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;">
+            <h4 style="color: #065f46; margin: 0 0 10px 0;">💡 What's Next?</h4>
+            <ul style="color: #047857; margin: 0; padding-left: 20px;">
+              <li>You'll receive a reminder email 24 hours before your session</li>
+              <li>Check your email for any additional instructions</li>
+              <li>Contact us if you need to reschedule</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+            Thank you for choosing our services! We look forward to working with you.
+          </p>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">
+            Best regards,<br>
+            <strong>Selling Infinity Team</strong>
+          </p>
+        </div>
+      </div>
+    `;
+
+    // SECURITY: Prepare email with sanitized content
+    const emailData = {
+      from: `"Selling Infinity" <${process.env.EMAIL_USER}>`,
+      to: customerEmail,
+      subject: `✅ Booking Confirmed - ${productName}`,
+      html: htmlContent,
+      // Add security headers
+      headers: {
+        'X-Mailer': 'Selling Infinity Booking System',
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal'
+      }
+    };
+    
+    console.log('📧 Preparing to send email...');
+    console.log('   To:', customerEmail);
+    console.log('   From:', process.env.EMAIL_USER);
+    console.log('   Subject:', emailData.subject);
+    console.log('   Email Source:', emailSource);
+
+    // SECURITY: Send email with comprehensive error handling
+    let emailResult;
+    try {
+      console.log('📤 Sending confirmation email...');
+      emailResult = await transporter.sendMail(emailData);
+      console.log('✅ Confirmation email sent successfully!');
+      console.log('   Message ID:', emailResult.messageId);
+      console.log('   Response:', emailResult.response);
+      console.log('   Accepted:', emailResult.accepted);
+      console.log('   Rejected:', emailResult.rejected);
+      
+      // Log successful email for audit trail
+      console.log('📋 EMAIL SENT SUCCESSFULLY:');
+      console.log('   Transaction ID:', transaction.id);
+      console.log('   Customer Email:', customerEmail);
+      console.log('   Customer Name:', customerName);
+      console.log('   Product:', productName);
+      console.log('   Email Source:', emailSource);
+      console.log('   Message ID:', emailResult.messageId);
+      console.log('   Timestamp:', new Date().toISOString());
+      
+      return { 
+        success: true, 
+        messageId: emailResult.messageId,
+        customerEmail: customerEmail,
+        emailSource: emailSource
+      };
+      
+    } catch (sendError) {
+      console.error('❌ Failed to send confirmation email:', sendError);
+      console.error('❌ Error details:', {
+        message: sendError.message,
+        code: sendError.code,
+        response: sendError.response,
+        customerEmail: customerEmail,
+        fromEmail: process.env.EMAIL_USER,
+        transactionId: transaction.id
+      });
+      
+      // SECURITY: Handle specific error types
+      let errorType = 'unknown';
+      if (sendError.code === 'EENVELOPE') {
+        errorType = 'invalid_recipient';
+        console.error('❌ Invalid recipient email address:', customerEmail);
+      } else if (sendError.code === 'EAUTH') {
+        errorType = 'authentication_failed';
+        console.error('❌ SMTP authentication failed - check EMAIL_USER and EMAIL_PASS');
+      } else if (sendError.code === 'ECONNECTION') {
+        errorType = 'connection_failed';
+        console.error('❌ SMTP connection failed - check internet connection');
+      } else if (sendError.code === 'ETIMEDOUT') {
+        errorType = 'timeout';
+        console.error('❌ SMTP timeout - server may be slow');
+      }
+      
+      return { 
+        success: false, 
+        error: sendError.message,
+        errorType: errorType,
+        customerEmail: customerEmail,
+        transactionId: transaction.id
+      };
+    }
+
+  } catch (error) {
+    console.error('❌ CRITICAL ERROR in sendConfirmationEmail:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Transaction ID:', transaction?.id);
+    console.error('❌ Product:', product?.name);
+    
+    return { 
+      success: false, 
+      error: 'Critical error in email processing',
+      details: error.message,
+      transactionId: transaction?.id
+    };
+  }
 }

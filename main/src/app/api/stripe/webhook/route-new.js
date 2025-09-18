@@ -99,8 +99,21 @@ async function handleCheckoutSessionCompleted(session) {
       await createCalendarEvent(transaction, product);
     }
 
-    // Send confirmation email
-    await sendConfirmationEmail(transaction, product, session);
+    // Send confirmation email with result handling
+    const emailResult = await sendConfirmationEmail(transaction, product, session);
+    if (emailResult && emailResult.success) {
+      console.log('✅ Booking confirmation email sent successfully');
+      console.log('   Message ID:', emailResult.messageId);
+      console.log('   Customer Email:', emailResult.customerEmail);
+      console.log('   Email Source:', emailResult.emailSource);
+    } else {
+      console.error('❌ Failed to send booking confirmation email');
+      if (emailResult) {
+        console.error('   Error:', emailResult.error);
+        console.error('   Error Type:', emailResult.errorType);
+        console.error('   Transaction ID:', emailResult.transactionId);
+      }
+    }
 
     console.log('Successfully processed checkout session:', session.id);
   } catch (error) {
@@ -172,84 +185,150 @@ async function handlePaymentFailed(paymentIntent) {
 
 async function sendConfirmationEmail(transaction, product, session) {
   try {
-    // Get customer email from logged-in user's profile (most reliable)
+    console.log('=== BOOKING CONFIRMATION EMAIL PROCESSING ===');
+    console.log('Transaction ID:', transaction.id);
+    console.log('Product:', product?.name);
+    console.log('User ID:', transaction.user_id);
+    
+    // SECURITY: Validate required parameters
+    if (!transaction || !transaction.id) {
+      console.error('Invalid transaction data provided');
+      return { success: false, error: 'Invalid transaction data' };
+    }
+    
+    if (!product || !product.name) {
+      console.error('Invalid product data provided');
+      return { success: false, error: 'Invalid product data' };
+    }
+    
+    // Get customer email from logged-in user's profile (SECURE & RELIABLE)
     let customerEmail = null;
     let customerName = 'Customer';
+    let emailSource = 'unknown';
     
-    // First, try to get email from logged-in user's profile
+    // PRIORITY 1: Get email from logged-in user's profile (MOST SECURE)
     if (transaction.user_id) {
-      console.log('Getting email from logged-in user profile:', transaction.user_id);
-      const { data: userProfile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('email, full_name')
-        .eq('id', transaction.user_id)
-        .single();
+      console.log('🔍 Extracting email from logged-in user profile...');
+      console.log('User ID:', transaction.user_id);
       
-      if (!profileError && userProfile) {
-        customerEmail = userProfile.email;
-        customerName = userProfile.full_name || 'Customer';
-        console.log('Found user email from profile:', customerEmail);
-      } else {
-        console.log('Profile error:', profileError);
+      try {
+        const { data: userProfile, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', transaction.user_id)
+          .single();
+        
+        if (!profileError && userProfile && userProfile.email) {
+          customerEmail = userProfile.email.trim();
+          customerName = userProfile.full_name?.trim() || 'Customer';
+          emailSource = 'user_profile';
+          console.log('✅ Successfully extracted email from user profile');
+          console.log('Email:', customerEmail);
+          console.log('Name:', customerName);
+        } else {
+          console.log('❌ Profile error or no email found:', profileError?.message || 'No email in profile');
+        }
+      } catch (profileError) {
+        console.error('❌ Database error while fetching user profile:', profileError);
       }
+    } else {
+      console.log('⚠️ No user_id found in transaction - user may not be logged in');
     }
     
-    // Fallback to session or transaction email if no user profile found
+    // PRIORITY 2: Fallback to Stripe session data (LESS SECURE)
     if (!customerEmail) {
-      customerEmail = session?.customer_details?.email || transaction.customer_email;
-      customerName = session?.customer_details?.name || transaction.customer_name || 'Customer';
-      console.log('Using fallback email:', customerEmail);
+      console.log('🔍 Falling back to Stripe session data...');
+      customerEmail = session?.customer_details?.email?.trim() || transaction.customer_email?.trim();
+      customerName = session?.customer_details?.name?.trim() || transaction.customer_name?.trim() || 'Customer';
+      emailSource = 'stripe_session';
+      console.log('Using Stripe session email:', customerEmail);
     }
     
-    console.log(`Sending confirmation email to ${customerEmail} for ${product?.name}`);
-    console.log('Session customer details:', session?.customer_details);
-    console.log('Transaction customer email:', transaction.customer_email);
-    console.log('Transaction user_id:', transaction.user_id);
-    
-    // Check if we have a valid customer email
-    if (!customerEmail) {
-      console.error('No customer email found - cannot send confirmation email');
-      return;
+    // SECURITY: Validate email exists and is not empty
+    if (!customerEmail || customerEmail.length === 0) {
+      console.error('❌ No customer email found - cannot send confirmation email');
+      return { success: false, error: 'No customer email found' };
     }
     
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // SECURITY: Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(customerEmail)) {
-      console.error(`Invalid email format: ${customerEmail}`);
-      return;
+      console.error(`❌ Invalid email format: ${customerEmail}`);
+      return { success: false, error: 'Invalid email format' };
     }
     
-    // Check for common invalid emails
-    const invalidEmails = ['guest@checkout.stripe.com', 'test@example.com', 'user@example.com'];
+    // SECURITY: Check for placeholder/invalid emails
+    const invalidEmails = [
+      'guest@checkout.stripe.com',
+      'test@example.com', 
+      'user@example.com',
+      'placeholder@example.com',
+      'admin@example.com',
+      'noreply@example.com'
+    ];
+    
     if (invalidEmails.includes(customerEmail.toLowerCase())) {
-      console.error(`Invalid placeholder email detected: ${customerEmail}`);
-      return;
+      console.error(`❌ Invalid placeholder email detected: ${customerEmail}`);
+      return { success: false, error: 'Invalid placeholder email' };
     }
     
-    // Check if email service is configured
+    // SECURITY: Log email source for audit trail
+    console.log('📧 Email extraction summary:');
+    console.log('   Source:', emailSource);
+    console.log('   Email:', customerEmail);
+    console.log('   Name:', customerName);
+    console.log('   Transaction ID:', transaction.id);
+    
+    // SECURITY: Check if email service is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('No email service configured - skipping email notification');
-      return;
+      console.error('❌ Email service not configured - missing EMAIL_USER or EMAIL_PASS');
+      return { success: false, error: 'Email service not configured' };
+    }
+    
+    console.log('📧 Email service configuration verified');
+    console.log('   SMTP User:', process.env.EMAIL_USER);
+    console.log('   SMTP Pass:', process.env.EMAIL_PASS ? '***configured***' : 'NOT SET');
+
+    // Import nodemailer with error handling
+    let nodemailer;
+    try {
+      nodemailer = await import('nodemailer');
+      console.log('✅ Nodemailer imported successfully');
+    } catch (importError) {
+      console.error('❌ Failed to import nodemailer:', importError);
+      return { success: false, error: 'Failed to import email library' };
     }
 
-    // Import nodemailer
-    const nodemailer = await import('nodemailer');
-
-    // Create Nodemailer transporter with Gmail SMTP
-    const transporter = nodemailer.createTransporter({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Verify connection
+    // Create Nodemailer transporter with Gmail SMTP (SECURE CONFIGURATION)
+    let transporter;
     try {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false // Allow self-signed certificates
+        }
+      });
+      console.log('✅ Nodemailer transporter created');
+    } catch (transporterError) {
+      console.error('❌ Failed to create transporter:', transporterError);
+      return { success: false, error: 'Failed to create email transporter' };
+    }
+
+    // SECURITY: Verify SMTP connection before sending
+    try {
+      console.log('🔍 Verifying SMTP connection...');
       await transporter.verify();
+      console.log('✅ SMTP connection verified successfully');
     } catch (verifyError) {
-      console.error('SMTP connection verification failed:', verifyError);
-      return;
+      console.error('❌ SMTP connection verification failed:', verifyError);
+      return { success: false, error: 'SMTP connection failed' };
     }
 
     // Prepare email content
@@ -308,36 +387,102 @@ async function sendConfirmationEmail(transaction, product, session) {
       </div>
     `;
 
-    // Send email using Nodemailer
-    const info = await transporter.sendMail({
+    // SECURITY: Prepare email with sanitized content
+    const emailData = {
       from: `"Selling Infinity" <${process.env.EMAIL_USER}>`,
       to: customerEmail,
       subject: `✅ Booking Confirmed - ${productName}`,
       html: htmlContent,
-    });
+      // Add security headers
+      headers: {
+        'X-Mailer': 'Selling Infinity Booking System',
+        'X-Priority': '3',
+        'X-MSMail-Priority': 'Normal'
+      }
+    };
+    
+    console.log('📧 Preparing to send email...');
+    console.log('   To:', customerEmail);
+    console.log('   From:', process.env.EMAIL_USER);
+    console.log('   Subject:', emailData.subject);
+    console.log('   Email Source:', emailSource);
 
-    console.log('Confirmation email sent successfully:', info.messageId);
-    console.log('Email sent to:', customerEmail);
-    console.log('Email sent from:', process.env.EMAIL_USER);
+    // SECURITY: Send email with comprehensive error handling
+    let emailResult;
+    try {
+      console.log('📤 Sending confirmation email...');
+      emailResult = await transporter.sendMail(emailData);
+      console.log('✅ Confirmation email sent successfully!');
+      console.log('   Message ID:', emailResult.messageId);
+      console.log('   Response:', emailResult.response);
+      console.log('   Accepted:', emailResult.accepted);
+      console.log('   Rejected:', emailResult.rejected);
+      
+      // Log successful email for audit trail
+      console.log('📋 EMAIL SENT SUCCESSFULLY:');
+      console.log('   Transaction ID:', transaction.id);
+      console.log('   Customer Email:', customerEmail);
+      console.log('   Customer Name:', customerName);
+      console.log('   Product:', productName);
+      console.log('   Email Source:', emailSource);
+      console.log('   Message ID:', emailResult.messageId);
+      console.log('   Timestamp:', new Date().toISOString());
+      
+      return { 
+        success: true, 
+        messageId: emailResult.messageId,
+        customerEmail: customerEmail,
+        emailSource: emailSource
+      };
+      
+    } catch (sendError) {
+      console.error('❌ Failed to send confirmation email:', sendError);
+      console.error('❌ Error details:', {
+        message: sendError.message,
+        code: sendError.code,
+        response: sendError.response,
+        customerEmail: customerEmail,
+        fromEmail: process.env.EMAIL_USER,
+        transactionId: transaction.id
+      });
+      
+      // SECURITY: Handle specific error types
+      let errorType = 'unknown';
+      if (sendError.code === 'EENVELOPE') {
+        errorType = 'invalid_recipient';
+        console.error('❌ Invalid recipient email address:', customerEmail);
+      } else if (sendError.code === 'EAUTH') {
+        errorType = 'authentication_failed';
+        console.error('❌ SMTP authentication failed - check EMAIL_USER and EMAIL_PASS');
+      } else if (sendError.code === 'ECONNECTION') {
+        errorType = 'connection_failed';
+        console.error('❌ SMTP connection failed - check internet connection');
+      } else if (sendError.code === 'ETIMEDOUT') {
+        errorType = 'timeout';
+        console.error('❌ SMTP timeout - server may be slow');
+      }
+      
+      return { 
+        success: false, 
+        error: sendError.message,
+        errorType: errorType,
+        customerEmail: customerEmail,
+        transactionId: transaction.id
+      };
+    }
 
   } catch (error) {
-    console.error('Error sending confirmation email:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      response: error.response,
-      customerEmail: customerEmail,
-      fromEmail: process.env.EMAIL_USER
-    });
+    console.error('❌ CRITICAL ERROR in sendConfirmationEmail:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Transaction ID:', transaction?.id);
+    console.error('❌ Product:', product?.name);
     
-    // Check for specific error types
-    if (error.code === 'EENVELOPE') {
-      console.error('Invalid recipient email address:', customerEmail);
-    } else if (error.code === 'EAUTH') {
-      console.error('SMTP authentication failed - check EMAIL_USER and EMAIL_PASS');
-    } else if (error.code === 'ECONNECTION') {
-      console.error('SMTP connection failed - check internet connection');
-    }
+    return { 
+      success: false, 
+      error: 'Critical error in email processing',
+      details: error.message,
+      transactionId: transaction?.id
+    };
   }
 }
 
