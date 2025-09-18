@@ -186,6 +186,20 @@ async function sendConfirmationEmail(transaction, product, session) {
       return;
     }
     
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+      console.error(`Invalid email format: ${customerEmail}`);
+      return;
+    }
+    
+    // Check for common invalid emails
+    const invalidEmails = ['guest@checkout.stripe.com', 'test@example.com', 'user@example.com'];
+    if (invalidEmails.includes(customerEmail.toLowerCase())) {
+      console.error(`Invalid placeholder email detected: ${customerEmail}`);
+      return;
+    }
+    
     // Check if email service is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.log('No email service configured - skipping email notification');
@@ -277,9 +291,27 @@ async function sendConfirmationEmail(transaction, product, session) {
     });
 
     console.log('Confirmation email sent successfully:', info.messageId);
+    console.log('Email sent to:', customerEmail);
+    console.log('Email sent from:', process.env.EMAIL_USER);
 
   } catch (error) {
     console.error('Error sending confirmation email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+      customerEmail: customerEmail,
+      fromEmail: process.env.EMAIL_USER
+    });
+    
+    // Check for specific error types
+    if (error.code === 'EENVELOPE') {
+      console.error('Invalid recipient email address:', customerEmail);
+    } else if (error.code === 'EAUTH') {
+      console.error('SMTP authentication failed - check EMAIL_USER and EMAIL_PASS');
+    } else if (error.code === 'ECONNECTION') {
+      console.error('SMTP connection failed - check internet connection');
+    }
   }
 }
 
