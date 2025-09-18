@@ -67,9 +67,30 @@ export function TimezoneProvider({ children }) {
 
   // Detect user's timezone automatically
   useEffect(() => {
-    const detectTimezone = () => {
+    const detectTimezone = async () => {
       try {
-        // Get browser timezone
+        // First, try to detect country and get timezone from country
+        const countryResponse = await fetch('/api/detect-country');
+        const countryData = await countryResponse.json();
+        
+        if (countryData.success && countryData.country.detected) {
+          const countryTimezone = countryData.country.timezone;
+          console.log(`Detected country: ${countryData.country.name} (${countryData.country.code}) - Setting timezone: ${countryTimezone}`);
+          
+          // Check if country timezone is in our supported list
+          const supportedTimezone = timezoneOptions.find(tz => tz.value === countryTimezone);
+          
+          if (supportedTimezone) {
+            setUserTimezone(countryTimezone);
+            localStorage.setItem('userTimezone', countryTimezone);
+            localStorage.setItem('userCountry', JSON.stringify(countryData.country));
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback to browser timezone detection
+        console.log('Country detection failed or timezone not supported, falling back to browser timezone');
         const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         // Check if it's in our supported list
@@ -77,17 +98,18 @@ export function TimezoneProvider({ children }) {
         
         if (supportedTimezone) {
           setUserTimezone(browserTimezone);
+          localStorage.setItem('userTimezone', browserTimezone);
         } else {
           // Fallback to UTC if timezone not supported
           console.warn(`Unsupported timezone: ${browserTimezone}, falling back to UTC`);
           setUserTimezone('UTC');
+          localStorage.setItem('userTimezone', 'UTC');
         }
         
-        // Store in localStorage for persistence
-        localStorage.setItem('userTimezone', browserTimezone);
       } catch (error) {
         console.error('Error detecting timezone:', error);
         setUserTimezone('UTC');
+        localStorage.setItem('userTimezone', 'UTC');
       } finally {
         setIsLoading(false);
       }
@@ -116,6 +138,17 @@ export function TimezoneProvider({ children }) {
   // Get timezone info
   const getTimezoneInfo = (timezone = userTimezone) => {
     return timezoneOptions.find(tz => tz.value === timezone) || timezoneOptions.find(tz => tz.value === 'UTC');
+  };
+
+  // Get detected country info
+  const getDetectedCountry = () => {
+    try {
+      const storedCountry = localStorage.getItem('userCountry');
+      return storedCountry ? JSON.parse(storedCountry) : null;
+    } catch (error) {
+      console.error('Error parsing stored country:', error);
+      return null;
+    }
   };
 
   // Format time in user's timezone
@@ -218,6 +251,7 @@ export function TimezoneProvider({ children }) {
     timezoneOptions,
     updateTimezone,
     getTimezoneInfo,
+    getDetectedCountry,
     formatTimeInTimezone,
     formatDateInTimezone,
     convertToUserTimezone,

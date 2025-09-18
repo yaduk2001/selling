@@ -99,7 +99,7 @@ async function handleCheckoutSessionCompleted(session) {
       await createCalendarEvent(transaction, product);
     }
 
-    // Send confirmation email (you can implement this later)
+    // Send confirmation email
     await sendConfirmationEmail(transaction, product);
 
     console.log('Successfully processed checkout session:', session.id);
@@ -172,8 +172,101 @@ async function handlePaymentFailed(paymentIntent) {
 
 async function sendConfirmationEmail(transaction, product) {
   try {
-    // TODO: Implement email sending using Resend or your preferred service
-    console.log(`Should send confirmation email to ${transaction.customer_email} for ${product?.name}`);
+    console.log(`Sending confirmation email to ${transaction.customer_email} for ${product?.name}`);
+    
+    // Check if email service is configured
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('No email service configured - skipping email notification');
+      return;
+    }
+
+    // Import nodemailer
+    const nodemailer = await import('nodemailer');
+
+    // Create Nodemailer transporter with Gmail SMTP
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Verify connection
+    try {
+      await transporter.verify();
+    } catch (verifyError) {
+      console.error('SMTP connection verification failed:', verifyError);
+      return;
+    }
+
+    // Prepare email content
+    const customerName = transaction.customer_name || 'Customer';
+    const sessionDate = transaction.booking_date ? new Date(transaction.booking_date).toLocaleDateString() : 'Not specified';
+    const sessionTime = transaction.booking_time || 'Not specified';
+    const productName = product?.name || 'Service';
+    const amountPaid = product?.price ? (product.price / 100).toFixed(2) : '0.00';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white;">
+        <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 40px 20px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">✅ Booking Confirmed!</h1>
+          <p style="color: #fed7aa; margin: 10px 0 0 0; font-size: 16px;">Your session has been successfully booked</p>
+        </div>
+        
+        <div style="padding: 40px 20px;">
+          <p style="font-size: 16px; color: #374151; margin-bottom: 30px;">
+            Hi ${customerName},
+          </p>
+          
+          <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+            Great news! Your booking has been confirmed. Here are your session details:
+          </p>
+          
+          <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 30px; margin: 30px 0;">
+            <h3 style="color: #1f2937; margin: 0 0 20px 0; font-size: 20px;">📅 Session Details</h3>
+            <div style="display: grid; gap: 15px;">
+              <div><strong>Date:</strong> ${sessionDate}</div>
+              <div><strong>Time:</strong> ${sessionTime}</div>
+              <div><strong>Service:</strong> ${productName}</div>
+              <div><strong>Amount Paid:</strong> $${amountPaid}</div>
+              <div><strong>Booking ID:</strong> ${transaction.id}</div>
+            </div>
+          </div>
+          
+          <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 0 8px 8px 0;">
+            <h4 style="color: #065f46; margin: 0 0 10px 0;">💡 What's Next?</h4>
+            <ul style="color: #047857; margin: 0; padding-left: 20px;">
+              <li>You'll receive a reminder email 24 hours before your session</li>
+              <li>Check your email for any additional instructions</li>
+              <li>Contact us if you need to reschedule</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+            Thank you for choosing our services! We look forward to working with you.
+          </p>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">
+            Best regards,<br>
+            <strong>Selling Infinity Team</strong>
+          </p>
+        </div>
+      </div>
+    `;
+
+    // Send email using Nodemailer
+    const info = await transporter.sendMail({
+      from: `"Selling Infinity" <${process.env.EMAIL_USER}>`,
+      to: transaction.customer_email,
+      subject: `✅ Booking Confirmed - ${productName}`,
+      html: htmlContent,
+    });
+
+    console.log('Confirmation email sent successfully:', info.messageId);
+
   } catch (error) {
     console.error('Error sending confirmation email:', error);
   }

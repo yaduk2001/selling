@@ -7,7 +7,7 @@ import { User, Mail, Phone, MapPin, Calendar, Edit2, Save, X, CheckCircle, Globe
 
 export default function ProfileManager() {
   const { user, getProfile, updateProfile } = useAuth();
-  const { userTimezone, timezoneOptions, getTimezonesByRegion, updateTimezone } = useTimezone();
+  const { userTimezone, timezoneOptions, getTimezonesByRegion, updateTimezone, getDetectedCountry } = useTimezone();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -298,16 +298,23 @@ export default function ProfileManager() {
                     ))}
                   </select>
                 </div>
-                {isEditing && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Current time: {new Date().toLocaleString('en-US', { 
-                      timeZone: formData.timezone,
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    })}
-                  </p>
-                )}
+                {(() => {
+                  const detectedCountry = getDetectedCountry();
+                  return detectedCountry && detectedCountry.detected ? (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      🌍 Detected location: {detectedCountry.name} ({detectedCountry.code})
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Current time: {new Date().toLocaleString('en-US', { 
+                        timeZone: formData.timezone,
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </div>
