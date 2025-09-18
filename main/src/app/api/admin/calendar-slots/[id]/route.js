@@ -7,6 +7,62 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+export async function PUT(request, { params }) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { date, startTime, endTime, reason } = body;
+
+    if (!id) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Event ID is required' 
+      }, { status: 400 });
+    }
+
+    // Convert date and time to ISO timestamp format
+    const startDateTimeLocal = `${date}T${startTime}:00`;
+    const endDateTimeLocal = `${date}T${endTime}:00`;
+    
+    const startDateTime = new Date(startDateTimeLocal);
+    const endDateTime = new Date(endDateTimeLocal);
+
+    // Update the blocked event in calendar_events table
+    const { data, error } = await supabaseAdmin
+      .from('calendar_events')
+      .update({
+        title: reason || 'Busy - Admin Block',
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        description: reason || 'Time blocked by admin',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error updating busy slot:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Failed to update busy slot' 
+      }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      data: data[0],
+      message: 'Busy slot updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error in update busy slot API:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Internal server error' 
+    }, { status: 500 });
+  }
+}
+
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
