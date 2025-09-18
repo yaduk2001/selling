@@ -301,8 +301,52 @@ async function handlePaymentFailed(paymentIntent) {
 
 async function sendConfirmationEmail(transaction, product) {
   try {
-    // TODO: Implement email sending using Resend or your preferred service
-    console.log(`Should send confirmation email to ${transaction.customer_email} for ${product?.name}`);
+    console.log(`Sending confirmation email to ${transaction.customer_email} for ${product?.name}`);
+    
+    // Check if email service is configured
+    if (!process.env.RESEND_API_KEY && !process.env.EMAIL_USER) {
+      console.log('No email service configured - skipping email notification');
+      return;
+    }
+
+    // Get email template from database
+    const { data: template, error: templateError } = await supabaseAdmin
+      .from('email_templates')
+      .select('*')
+      .eq('template_key', 'booking_confirmation')
+      .single();
+
+    if (templateError || !template) {
+      console.error('Error fetching email template:', templateError);
+      return;
+    }
+
+    // Prepare email data
+    const emailData = {
+      type: 'booking_confirmation',
+      customerName: transaction.customer_name || 'Customer',
+      customerEmail: transaction.customer_email,
+      sessionDate: transaction.booking_date ? new Date(transaction.booking_date).toLocaleDateString() : 'Not specified',
+      sessionTime: transaction.booking_time || 'Not specified',
+      productName: product?.name || 'Service',
+      amountPaid: product?.price ? (product.price / 100).toFixed(2) : '0.00',
+      bookingId: transaction.id,
+      adminEmail: process.env.ADMIN_EMAIL || 'admin@sellinginfinity.com'
+    };
+
+    // Send email using the admin notification API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/send-admin-notification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(emailData)
+    });
+
+    if (response.ok) {
+      console.log('Confirmation email sent successfully');
+    } else {
+      console.error('Failed to send confirmation email:', await response.text());
+    }
+
   } catch (error) {
     console.error('Error sending confirmation email:', error);
   }

@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 export async function POST(request) {
   try {
     const data = await request.json();
+    const { type } = data;
     
     if (type === 'booking_confirmation') {
       const resend = new Resend(process.env.RESEND_API_KEY);

@@ -60,6 +60,7 @@ export default function AdminDashboard() {
     recentUsers: []
   });
   const [loadingData, setLoadingData] = useState(true);
+  const [sendingReminders, setSendingReminders] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -125,6 +126,29 @@ export default function AdminDashboard() {
       });
     }
     setLoadingData(false);
+  };
+
+  const handleSendReminders = async () => {
+    setSendingReminders(true);
+    try {
+      const response = await fetch('/api/admin/send-session-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'manual' })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        success(`Session reminders sent: ${result.results.successful} successful, ${result.results.failed} failed`);
+      } else {
+        showError('Failed to send reminders: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error sending reminders:', error);
+      showError('Error sending reminders: ' + error.message);
+    } finally {
+      setSendingReminders(false);
+    }
   };
 
   if (loading || !user) {
@@ -1597,6 +1621,39 @@ export default function AdminDashboard() {
 
               {/* Busy Slots Manager */}
               <BusySlotsManager />
+
+              {/* Email Notifications Section */}
+              <div className="bg-gray-700 rounded-lg p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <Mail className="h-8 w-8 text-purple-400" />
+                  <div>
+                    <h4 className="text-white font-medium">Session Reminders</h4>
+                    <p className="text-gray-400 text-sm">Send email reminders for upcoming sessions</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleSendReminders}
+                    disabled={sendingReminders}
+                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    {sendingReminders ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4" />
+                        <span>Send Tomorrow's Reminders</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="text-sm text-gray-300">
+                    Automatically sends 24-hour reminders to customers with sessions tomorrow
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
