@@ -10,7 +10,7 @@ const supabaseAdmin = createClient(
 // Create email transporter
 const createTransporter = () => {
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
@@ -23,7 +23,15 @@ const createTransporter = () => {
 
 export async function POST(request) {
   try {
-    const { type = 'manual' } = await request.json(); // 'manual' or 'automatic'
+    // Handle both JSON and non-JSON requests
+    let type = 'manual';
+    try {
+      const body = await request.json();
+      type = body.type || 'manual';
+    } catch (error) {
+      // If no JSON body, use default type
+      console.log('No JSON body provided, using default type: manual');
+    }
     
     console.log(`Sending session reminders (${type})...`);
 
@@ -40,7 +48,7 @@ export async function POST(request) {
         products (
           name,
           price,
-          duration
+          type
         )
       `)
       .eq('booking_date', tomorrowDate)
@@ -58,15 +66,16 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         message: 'No sessions scheduled for tomorrow',
+        sentCount: 0,
         sent: 0
       });
     }
 
-    // Get email template
+    // Get email template - look for reminder template
     const { data: template, error: templateError } = await supabaseAdmin
       .from('email_templates')
       .select('*')
-      .eq('template_key', 'booking_reminder')
+      .or('template_type.eq.reminder,name.ilike.%reminder%')
       .single();
 
     if (templateError || !template) {
@@ -88,32 +97,36 @@ export async function POST(request) {
 
     // Send reminders
     const results = [];
+    console.log(`Found ${bookings.length} bookings for tomorrow. Sending reminders...`);
+    
     for (const booking of bookings) {
       try {
-        // Replace placeholders in template
-        const personalizedSubject = template.subject.replace(/\{(\w+)\}/g, (match, key) => {
+        console.log(`Processing reminder for booking ${booking.id} - ${booking.customer_email}`);
+        
+        // Replace placeholders in template using {{placeholder}} format
+        const personalizedSubject = template.subject.replace(/\{\{(\w+)\}\}/g, (match, key) => {
           const replacements = {
-            customerName: booking.customer_name || 'Customer',
-            sessionDate: new Date(booking.booking_date).toLocaleDateString(),
-            sessionTime: booking.booking_time,
-            productName: booking.products?.name || 'Service'
+            customer_name: booking.customer_name || 'Customer',
+            booking_date: new Date(booking.booking_date).toLocaleDateString(),
+            booking_time: booking.booking_time,
+            service_name: booking.products?.name || 'Service'
           };
           return replacements[key] || match;
         });
 
-        const personalizedContent = template.content.replace(/\{(\w+)\}/g, (match, key) => {
+        const personalizedContent = template.html_content.replace(/\{\{(\w+)\}\}/g, (match, key) => {
           const replacements = {
-            customerName: booking.customer_name || 'Customer',
-            sessionDate: new Date(booking.booking_date).toLocaleDateString(),
-            sessionTime: booking.booking_time,
-            productName: booking.products?.name || 'Service',
-            duration: booking.products?.duration || 60,
-            meetingLink: booking.meeting_link || 'TBD'
+            customer_name: booking.customer_name || 'Customer',
+            booking_date: new Date(booking.booking_date).toLocaleDateString(),
+            booking_time: booking.booking_time,
+            service_name: booking.products?.name || 'Service',
+            duration: 60, // Default duration since products table doesn't have duration
+            meeting_link: booking.meeting_link || 'TBD'
           };
           return replacements[key] || match;
         });
 
-        // Send email
+        // Send email using Nodemailer
         const info = await transporter.sendMail({
           from: `"Selling Infinity" <${process.env.EMAIL_USER}>`,
           to: booking.customer_email,
@@ -128,10 +141,10 @@ export async function POST(request) {
           messageId: info.messageId
         });
 
-        console.log(`Reminder sent to ${booking.customer_email} for booking ${booking.id}`);
+        console.log(`✅ Reminder sent successfully to ${booking.customer_email} for booking ${booking.id}`);
 
       } catch (error) {
-        console.error(`Failed to send reminder to ${booking.customer_email}:`, error);
+        console.error(`❌ Failed to send reminder to ${booking.customer_email}:`, error);
         results.push({
           success: false,
           bookingId: booking.id,
@@ -158,6 +171,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: `Session reminders sent: ${successful} successful, ${failed} failed`,
+      sentCount: successful,
       results: {
         total: bookings.length,
         successful,
@@ -193,7 +207,7 @@ export async function GET(request) {
         status,
         products (
           name,
-          duration
+          type
         )
       `)
       .eq('booking_date', tomorrowDate)

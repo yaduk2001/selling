@@ -30,7 +30,13 @@ export default function AdminCalendar() {
   const [bookings, setBookings] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [showAddBusyModal, setShowAddBusyModal] = useState(false);
-  const [newBusySlot, setNewBusySlot] = useState({ date: '', startTime: '', endTime: '', reason: '' });
+  const [newBusySlot, setNewBusySlot] = useState({ 
+    date: '', 
+    startTime: '', 
+    endTime: '', 
+    reason: '', 
+    awayStatus: false 
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -111,7 +117,7 @@ export default function AdminCalendar() {
       if (response.ok) {
         refreshData(); // Refresh data
         setShowAddBusyModal(false);
-        setNewBusySlot({ date: '', startTime: '', endTime: '', reason: '' });
+        setNewBusySlot({ date: '', startTime: '', endTime: '', reason: '', awayStatus: false });
       }
     } catch (error) {
       console.error('Error marking slot as busy:', error);
@@ -398,15 +404,30 @@ export default function AdminCalendar() {
                       </h4>
                       <div className="space-y-2">
                         {busySlots.map((slot) => (
-                          <div key={slot.id} className="bg-gray-700 border border-gray-600 rounded p-3">
+                          <div key={slot.id} className={`border rounded p-3 ${
+                            slot.away_status 
+                              ? 'bg-blue-900/20 border-blue-500/30' 
+                              : 'bg-gray-700 border-gray-600'
+                          }`}>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
-                                <Clock className="h-4 w-4 text-red-400" />
+                                {slot.away_status ? (
+                                  <span className="text-blue-400">🚫</span>
+                                ) : (
+                                  <Clock className="h-4 w-4 text-red-400" />
+                                )}
                                 <span className="text-sm font-medium text-white">{slot.title || 'Busy'}</span>
+                                {slot.away_status && (
+                                  <span className="px-2 py-1 bg-blue-800/30 text-blue-300 text-xs rounded-full border border-blue-500/30">
+                                    Away
+                                  </span>
+                                )}
                               </div>
                               <button
                                 onClick={() => removeBusySlot(slot.id)}
-                                className="text-red-400 hover:text-red-300"
+                                className={`hover:opacity-80 ${
+                                  slot.away_status ? 'text-blue-400 hover:text-blue-300' : 'text-red-400 hover:text-red-300'
+                                }`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -490,6 +511,35 @@ export default function AdminCalendar() {
                   rows="3"
                 />
               </div>
+
+              {/* Away Status Option */}
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="awayStatus"
+                    checked={newBusySlot.awayStatus}
+                    onChange={(e) => setNewBusySlot({ ...newBusySlot, awayStatus: e.target.checked })}
+                    className="rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="awayStatus" className="text-sm font-medium text-blue-300 cursor-pointer">
+                      🚫 Mark as "Away" / "Not Available"
+                    </label>
+                    <p className="text-xs text-blue-200 mt-1">
+                      Use this for sleeping time, physical activity, or when you're completely unavailable for any sessions
+                    </p>
+                  </div>
+                </div>
+                
+                {newBusySlot.awayStatus && (
+                  <div className="mt-3 p-3 bg-blue-800/20 rounded border border-blue-600/30">
+                    <p className="text-sm text-blue-200">
+                      <strong>💡 Away Status:</strong> This will block all bookings during this time period and show you as "Not Available" to clients.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -501,10 +551,14 @@ export default function AdminCalendar() {
               </button>
               <button
                 onClick={handleAddBusySlot}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center space-x-2 transition-colors"
+                className={`px-4 py-2 text-white rounded flex items-center space-x-2 transition-colors ${
+                  newBusySlot.awayStatus 
+                    ? 'bg-blue-600 hover:bg-blue-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
               >
                 <Save className="h-4 w-4" />
-                <span>Mark as Busy</span>
+                <span>{newBusySlot.awayStatus ? 'Mark as Away' : 'Mark as Busy'}</span>
               </button>
             </div>
           </div>

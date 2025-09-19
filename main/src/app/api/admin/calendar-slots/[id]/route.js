@@ -11,7 +11,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { date, startTime, endTime, reason } = body;
+    const { date, startTime, endTime, reason, awayStatus } = body;
 
     if (!id) {
       return NextResponse.json({ 
@@ -31,10 +31,11 @@ export async function PUT(request, { params }) {
     const { data, error } = await supabaseAdmin
       .from('calendar_events')
       .update({
-        title: reason || 'Busy - Admin Block',
+        title: awayStatus ? 'Away - Not Available' : (reason || 'Busy - Admin Block'),
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
-        description: reason || 'Time blocked by admin',
+        description: awayStatus ? 'Admin is away/unavailable' : (reason || 'Time blocked by admin'),
+        away_status: awayStatus || false,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

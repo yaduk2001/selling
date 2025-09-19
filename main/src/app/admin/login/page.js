@@ -16,13 +16,32 @@ export default function AdminLoginPage() {
   const { user, signIn } = useAuth();
   const router = useRouter();
 
-  // Redirect if already logged in
+  // Redirect if already logged in and is admin
   useEffect(() => {
     if (user) {
-      // Check if user has admin role (you can implement role checking here)
-      router.push('/admin/dashboard');
+      checkAdminStatus(user.email);
     }
   }, [user, router]);
+
+  const checkAdminStatus = async (userEmail) => {
+    try {
+      const response = await fetch('/api/admin/check-admin-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail })
+      });
+      const data = await response.json();
+      
+      if (data.success && data.isAdmin) {
+        router.push('/admin/dashboard');
+      } else {
+        setError('Access denied. Admin privileges required.');
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setError('Error verifying admin access.');
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -34,9 +53,8 @@ export default function AdminLoginPage() {
     if (authError) {
       setError(authError.message);
     } else if (data.user) {
-      // TODO: Add admin role verification here
-      // For now, any authenticated user can access admin
-      router.push('/admin/dashboard');
+      // Check admin status after successful login
+      await checkAdminStatus(email);
     }
     
     setLoading(false);

@@ -11,7 +11,8 @@ const BusySlotsManager = () => {
     date: new Date().toISOString().split('T')[0],
     startTime: '09:00',
     endTime: '10:00',
-    reason: ''
+    reason: '',
+    awayStatus: false
   });
   const [showNewSlotForm, setShowNewSlotForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,7 +57,8 @@ const BusySlotsManager = () => {
           date: selectedDate,
           startTime: '09:00',
           endTime: '10:00',
-          reason: ''
+          reason: '',
+          awayStatus: false
         });
         setSendEmailNotification(false);
         success('Busy slot created successfully!');
@@ -151,7 +153,8 @@ const BusySlotsManager = () => {
       title: slot.title || '',
       description: slot.description || '',
       start_time: slot.start_time ? slot.start_time.slice(0, 16) : '',
-      end_time: slot.end_time ? slot.end_time.slice(0, 16) : ''
+      end_time: slot.end_time ? slot.end_time.slice(0, 16) : '',
+      awayStatus: slot.away_status || false
     });
 
     return (
@@ -195,6 +198,36 @@ const BusySlotsManager = () => {
               />
             </div>
           </div>
+          
+          {/* Away Status Option */}
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="awayStatusEdit"
+                checked={formData.awayStatus}
+                onChange={(e) => setFormData({...formData, awayStatus: e.target.checked})}
+                className="rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <label htmlFor="awayStatusEdit" className="text-sm font-medium text-blue-300 cursor-pointer">
+                  🚫 Mark as "Away" / "Not Available"
+                </label>
+                <p className="text-xs text-blue-200 mt-1">
+                  Use this for sleeping time, physical activity, or when you're completely unavailable for any sessions
+                </p>
+              </div>
+            </div>
+            
+            {formData.awayStatus && (
+              <div className="mt-3 p-3 bg-blue-800/20 rounded border border-blue-600/30">
+                <p className="text-sm text-blue-200">
+                  <strong>💡 Away Status:</strong> This will block all bookings during this time period and show you as "Not Available" to clients.
+                </p>
+              </div>
+            )}
+          </div>
+          
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -317,6 +350,35 @@ const BusySlotsManager = () => {
                 className="w-full p-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-orange-500"
               />
             </div>
+            
+            {/* Away Status Option */}
+            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="awayStatus"
+                  checked={newSlot.awayStatus}
+                  onChange={(e) => setNewSlot({...newSlot, awayStatus: e.target.checked})}
+                  className="rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <label htmlFor="awayStatus" className="text-sm font-medium text-blue-300 cursor-pointer">
+                    🚫 Mark as "Away" / "Not Available"
+                  </label>
+                  <p className="text-xs text-blue-200 mt-1">
+                    Use this for sleeping time, physical activity, or when you're completely unavailable for any sessions
+                  </p>
+                </div>
+              </div>
+              
+              {newSlot.awayStatus && (
+                <div className="mt-3 p-3 bg-blue-800/20 rounded border border-blue-600/30">
+                  <p className="text-sm text-blue-200">
+                    <strong>💡 Away Status:</strong> This will block all bookings during this time period and show you as "Not Available" to clients.
+                  </p>
+                </div>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -387,7 +449,14 @@ const BusySlotsManager = () => {
                               </span>
                             </div>
                             <div className="text-gray-300">
-                              <span className="font-medium">{slot.title || 'Busy - Admin Block'}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium">{slot.title || 'Busy - Admin Block'}</span>
+                                {slot.away_status && (
+                                  <span className="px-2 py-1 bg-red-900/30 text-red-300 text-xs rounded-full border border-red-500/30">
+                                    🚫 Away
+                                  </span>
+                                )}
+                              </div>
                               {slot.description && (
                                 <span className="text-gray-400 text-sm ml-2">• {slot.description}</span>
                               )}

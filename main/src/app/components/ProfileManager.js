@@ -20,7 +20,7 @@ export default function ProfileManager() {
     company: '',
     job_title: '',
     bio: '',
-    timezone: '',
+    timezone: 'UTC',
     notification_preferences: {
       email_bookings: true,
       email_reminders: true,
@@ -46,7 +46,7 @@ export default function ProfileManager() {
         company: data.company || '',
         job_title: data.job_title || '',
         bio: data.bio || '',
-        timezone: data.timezone || userTimezone,
+        timezone: data.timezone || userTimezone || 'UTC',
         notification_preferences: data.notification_preferences || {
           email_bookings: true,
           email_reminders: true,
@@ -302,16 +302,36 @@ export default function ProfileManager() {
                   const detectedCountry = getDetectedCountry();
                   return detectedCountry && detectedCountry.detected ? (
                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      🌍 Detected location: {detectedCountry.name} ({detectedCountry.code})
+                      🌍 Auto-detected: {detectedCountry.name} ({detectedCountry.code}) - {formData.timezone}
                     </p>
                   ) : (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Current time: {new Date().toLocaleString('en-US', { 
-                        timeZone: formData.timezone,
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
+                      Current time: {(() => {
+                        try {
+                          // Only show time if timezone is valid and not empty
+                          if (formData.timezone && formData.timezone.trim()) {
+                            return new Date().toLocaleString('en-US', { 
+                              timeZone: formData.timezone,
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            });
+                          } else {
+                            return new Date().toLocaleString('en-US', { 
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Error formatting time:', error);
+                          return new Date().toLocaleString('en-US', { 
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          });
+                        }
+                      })()}
                     </p>
                   );
                 })()}

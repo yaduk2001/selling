@@ -65,8 +65,29 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!loading && !user) {
       router.push('/admin/login');
+    } else if (user) {
+      checkAdminAccess();
     }
   }, [user, loading, router]);
+
+  const checkAdminAccess = async () => {
+    try {
+      const response = await fetch('/api/admin/check-admin-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email })
+      });
+      const data = await response.json();
+      
+      if (!data.success || !data.isAdmin) {
+        router.push('/admin/login');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking admin access:', error);
+      router.push('/admin/login');
+    }
+  };
 
   useEffect(() => {
     if (user) {

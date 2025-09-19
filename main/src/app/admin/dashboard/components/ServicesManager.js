@@ -13,8 +13,9 @@ export default function ServicesManager({ user }) {
     name: '',
     description: '',
     price: '',
-    duration: '',
-    is_active: true
+    type: '',
+    features: '',
+    is_popular: false
   });
 
   useEffect(() => {
@@ -61,8 +62,9 @@ export default function ServicesManager({ user }) {
           name: '',
           description: '',
           price: '',
-          duration: '',
-          is_active: true
+          type: '',
+          features: '',
+          is_popular: false
         });
       }
     } catch (error) {
@@ -76,8 +78,9 @@ export default function ServicesManager({ user }) {
       name: service.name || '',
       description: service.description || '',
       price: service.price || '',
-      duration: service.duration || '',
-      is_active: service.is_active !== false
+      type: service.type || '',
+      features: service.features || '',
+      is_popular: service.is_popular || false
     });
     setShowForm(true);
   };
@@ -127,8 +130,9 @@ export default function ServicesManager({ user }) {
               name: '',
               description: '',
               price: '',
-              duration: '',
-              is_active: true
+              type: '',
+              features: '',
+              is_popular: false
             });
           }}
           className="bg-primary text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
@@ -174,24 +178,38 @@ export default function ServicesManager({ user }) {
                 />
               </div>
               <div>
-                <label className="block text-text-primary font-medium mb-2">Duration (minutes)</label>
-                <input
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                <label className="block text-text-primary font-medium mb-2">Service Type</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   className="w-full p-3 bg-surface border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                >
+                  <option value="">Select service type</option>
+                  <option value="coaching_individual">1-on-1 Coaching</option>
+                  <option value="coaching_team">Team Coaching</option>
+                  <option value="pdf">PDF Download</option>
+                </select>
               </div>
+            </div>
+            <div>
+              <label className="block text-text-primary font-medium mb-2">Features (comma-separated)</label>
+              <textarea
+                value={formData.features}
+                onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                placeholder="Feature 1, Feature 2, Feature 3..."
+                className="w-full p-3 bg-surface border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                rows="3"
+              />
             </div>
             <div className="flex items-center">
               <input
                 type="checkbox"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                id="is_popular"
+                checked={formData.is_popular}
+                onChange={(e) => setFormData({ ...formData, is_popular: e.target.checked })}
                 className="mr-2"
               />
-              <label htmlFor="is_active" className="text-text-primary">Service is active</label>
+              <label htmlFor="is_popular" className="text-text-primary">Mark as popular service</label>
             </div>
             <div className="flex space-x-4">
               <button
@@ -221,8 +239,8 @@ export default function ServicesManager({ user }) {
             <tr>
               <th className="px-6 py-3 text-left text-text-primary font-medium">Name</th>
               <th className="px-6 py-3 text-left text-text-primary font-medium">Price</th>
-              <th className="px-6 py-3 text-left text-text-primary font-medium">Duration</th>
-              <th className="px-6 py-3 text-left text-text-primary font-medium">Status</th>
+              <th className="px-6 py-3 text-left text-text-primary font-medium">Type</th>
+              <th className="px-6 py-3 text-left text-text-primary font-medium">Popular</th>
               <th className="px-6 py-3 text-left text-text-primary font-medium">Actions</th>
             </tr>
           </thead>
@@ -237,14 +255,14 @@ export default function ServicesManager({ user }) {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-text-primary">${service.price}</td>
-                  <td className="px-6 py-4 text-text-primary">{service.duration} min</td>
+                  <td className="px-6 py-4 text-text-primary">{service.type || 'N/A'}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      service.is_active 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
+                      service.is_popular 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {service.is_active ? 'Active' : 'Inactive'}
+                      {service.is_popular ? 'Popular' : 'Standard'}
                     </span>
                   </td>
                   <td className="px-6 py-4 space-x-2">

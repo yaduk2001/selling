@@ -88,12 +88,22 @@ export default function Pricing({ products, onPurchaseNow }) {
                   </p>
                   
                   <ul className="text-sm space-y-3 mb-8 text-left text-gray-600 dark:text-gray-300">
-                    {product.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
-                        <Star size={16} className="mr-2 mt-1 text-blue-600 dark:text-yellow-400 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                    {(() => {
+                      // Handle different feature formats: array, string, or empty
+                      let features = [];
+                      if (Array.isArray(product.features)) {
+                        features = product.features;
+                      } else if (typeof product.features === 'string' && product.features.trim()) {
+                        features = product.features.split(',').map(f => f.trim()).filter(f => f);
+                      }
+                      
+                      return features.map((feature, index) => (
+                        <li key={index} className="flex items-start">
+                          <Star size={16} className="mr-2 mt-1 text-blue-600 dark:text-yellow-400 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      ));
+                    })()}
                   </ul>
                   
                   <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">

@@ -122,12 +122,12 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action, date, startTime, endTime, reason } = body;
+    const { action, date, startTime, endTime, reason, awayStatus } = body;
 
     if (action === 'mark_busy') {
       // Insert a new blocked event in calendar_events table
       // Convert date and time to ISO timestamp format using local timezone
-      console.log('Creating busy slot with:', { date, startTime, endTime, reason });
+      console.log('Creating busy slot with:', { date, startTime, endTime, reason, awayStatus });
       
       // Create local datetime strings and convert to UTC for storage
       const startDateTimeLocal = `${date}T${startTime}:00`;
@@ -146,10 +146,11 @@ export async function POST(request) {
       });      const { data, error } = await supabaseAdmin
         .from('calendar_events')
         .insert({
-          title: reason || 'Busy - Admin Block',
+          title: awayStatus ? 'Away - Not Available' : (reason || 'Busy - Admin Block'),
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          description: reason || 'Time blocked by admin',
+          description: awayStatus ? 'Admin is away/unavailable' : (reason || 'Time blocked by admin'),
+          away_status: awayStatus || false,
           created_at: new Date().toISOString()
         })
         .select();

@@ -51,10 +51,108 @@ export async function POST(request, { params }) {
       // Don't fail the ban if booking cancellation fails
     }
 
-    // TODO: Send email notification if sendEmail is true
-    if (sendEmail) {
-      // Email notification would go here
-      console.log(`Would send ban notification email to ${userEmail}`);
+    // Send email notification if sendEmail is true
+    if (sendEmail && userEmail) {
+      try {
+        // Get the account suspended template
+        const { data: template, error: templateError } = await supabaseAdmin
+          .from('email_templates')
+          .select('*')
+          .eq('template_type', 'account')
+          .eq('name', 'Account Suspended')
+          .single();
+
+        if (templateError || !template) {
+          console.error('Account suspended template not found:', templateError);
+          // Fallback to simple email
+          const nodemailer = await import('nodemailer');
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS,
+            },
+          });
+
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: userEmail,
+            subject: '⚠️ Account Suspended - Action Required',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white;">
+                <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 40px 20px; text-align: center;">
+                  <h1 style="color: white; margin: 0; font-size: 28px;">Account Suspended</h1>
+                  <p style="color: #fecaca; margin: 10px 0 0 0; font-size: 16px;">Important notice regarding your account</p>
+                </div>
+                
+                <div style="padding: 40px 20px;">
+                  <p style="font-size: 16px; color: #374151; margin-bottom: 30px;">
+                    Hi ${userName || 'User'},
+                  </p>
+                  
+                  <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                    We are writing to inform you that your account has been temporarily suspended due to a violation of our terms of service.
+                  </p>
+                  
+                  <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; padding: 30px; margin: 30px 0;">
+                    <h3 style="color: #dc2626; margin: 0 0 20px 0; font-size: 20px;">⚠️ Suspension Details</h3>
+                    <div style="display: grid; gap: 15px;">
+                      <div><strong>Reason:</strong> Terms of service violation</div>
+                      <div><strong>Duration:</strong> 1 year</div>
+                      <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+                      <div><strong>Account:</strong> ${userEmail}</div>
+                    </div>
+                  </div>
+                  
+                  <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                    If you have any questions or concerns about this suspension, please contact our support team immediately.
+                  </p>
+                </div>
+                
+                <div style="background: #f9fafb; padding: 30px 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                  <p style="color: #6b7280; font-size: 14px; margin: 0;">
+                    Best regards,<br>
+                    <strong>Selling Infinity Support Team</strong>
+                  </p>
+                </div>
+              </div>
+            `
+          });
+        } else {
+          // Use the template with placeholders
+          const nodemailer = await import('nodemailer');
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASS,
+            },
+          });
+
+          // Replace placeholders in the template
+          let emailContent = template.html_content;
+          emailContent = emailContent.replace(/\{\{customer_name\}\}/g, userName || 'User');
+          emailContent = emailContent.replace(/\{\{customer_email\}\}/g, userEmail);
+          emailContent = emailContent.replace(/\{\{suspension_reason\}\}/g, 'Terms of service violation');
+          emailContent = emailContent.replace(/\{\{suspension_duration\}\}/g, '1 year');
+          emailContent = emailContent.replace(/\{\{suspension_date\}\}/g, new Date().toLocaleDateString());
+          emailContent = emailContent.replace(/\{\{support_link\}\}/g, process.env.NEXT_PUBLIC_SITE_URL + '/contact');
+
+          let emailSubject = template.subject;
+          emailSubject = emailSubject.replace(/\{\{customer_name\}\}/g, userName || 'User');
+
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: userEmail,
+            subject: emailSubject,
+            html: emailContent
+          });
+        }
+
+        console.log(`Account suspended email sent to ${userEmail}`);
+      } catch (emailError) {
+        console.error('Error sending account suspended email:', emailError);
+      }
     }
 
     return NextResponse.json({

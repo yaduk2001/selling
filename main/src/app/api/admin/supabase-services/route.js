@@ -6,9 +6,9 @@ export async function GET(request) {
   try {
     const supabase = createAdminClient();
     
-    // Get all services from Supabase
+    // Get all services from products table (since bookings reference products)
     const { data: services, error } = await supabase
-      .from('services')
+      .from('products')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -31,7 +31,7 @@ export async function POST(request) {
     const supabase = createAdminClient();
     
     const { data, error } = await supabase
-      .from('services')
+      .from('products')
       .insert([body])
       .select()
       .single();
@@ -56,7 +56,7 @@ export async function PUT(request) {
     const supabase = createAdminClient();
     
     const { data, error } = await supabase
-      .from('services')
+      .from('products')
       .update(updates)
       .eq('id', id)
       .select()
@@ -87,7 +87,7 @@ export async function DELETE(request) {
     const supabase = createAdminClient();
     
     const { error } = await supabase
-      .from('services')
+      .from('products')
       .delete()
       .eq('id', id);
 

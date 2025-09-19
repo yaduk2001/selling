@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
+// COMMENTED OUT: Resend import - requires RESEND_API_KEY
+// import { Resend } from 'resend';
 
 export async function POST(request) {
   try {
@@ -7,12 +8,13 @@ export async function POST(request) {
     const { type } = data;
     
     if (type === 'booking_confirmation') {
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      // COMMENTED OUT: Resend logic - requires RESEND_API_KEY
+      // const resend = new Resend(process.env.RESEND_API_KEY);
 
-      if (!process.env.RESEND_API_KEY) {
-        console.error('RESEND_API_KEY not configured');
-        return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
-      }
+      // if (!process.env.RESEND_API_KEY) {
+      //   console.error('RESEND_API_KEY not configured');
+      //   return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
+      // }
 
       const adminEmailHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -46,20 +48,25 @@ export async function POST(request) {
         </div>
       `;
 
-      const { data: emailData, error } = await resend.emails.send({
-        from: 'Selling Infinity <noreply@sellinginfinity.com>',
-        to: [data.adminEmail],
-        subject: `🔔 New Coaching Booking - ${data.customerName} (${data.sessionDate})`,
-        html: adminEmailHtml
-      });
+      // COMMENTED OUT: Resend email sending - requires RESEND_API_KEY
+      // const { data: emailData, error } = await resend.emails.send({
+      //   from: 'Selling Infinity <noreply@sellinginfinity.com>',
+      //   to: [data.adminEmail],
+      //   subject: `🔔 New Coaching Booking - ${data.customerName} (${data.sessionDate})`,
+      //   html: adminEmailHtml
+      // });
 
-      if (error) {
-        console.error('Error sending admin notification:', error);
-        return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
-      }
+      // if (error) {
+      //   console.error('Error sending admin notification:', error);
+      //   return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
+      // }
 
-      console.log('Admin notification email sent successfully');
-      return NextResponse.json({ success: true });
+      // console.log('Admin notification email sent successfully');
+      // return NextResponse.json({ success: true });
+      
+      // TEMPORARY: Return success without sending email (RESEND_API_KEY not configured)
+      console.log('Admin notification skipped - RESEND_API_KEY not configured');
+      return NextResponse.json({ success: true, message: 'Notification skipped - email service not configured' });
     }
 
     return NextResponse.json({ error: 'Invalid notification type' }, { status: 400 });

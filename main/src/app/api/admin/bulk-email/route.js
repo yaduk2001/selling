@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
+// COMMENTED OUT: Resend import - requires RESEND_API_KEY
+// import { Resend } from 'resend';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -99,15 +100,15 @@ export async function POST(request) {
       });
     }
 
-    // Initialize Resend
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // COMMENTED OUT: Resend initialization - requires RESEND_API_KEY
+    // const resend = new Resend(process.env.RESEND_API_KEY);
 
-    if (!process.env.RESEND_API_KEY) {
-      return NextResponse.json(
-        { success: false, error: 'Email service not configured' },
-        { status: 500 }
-      );
-    }
+    // if (!process.env.RESEND_API_KEY) {
+    //   return NextResponse.json(
+    //     { success: false, error: 'Email service not configured' },
+    //     { status: 500 }
+    //   );
+    // }
 
     // Send emails to all recipients
     const sendPromises = recipients.map(async (recipient) => {
